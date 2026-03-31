@@ -46,3 +46,82 @@ h3{
     background-repeat: no-repeat;
     box-shadow: 5px 5px 5px #888888;
 }
+.contain{
+    width: 100%;
+}
+.header{
+    background-color: rgb(156, 180, 248);
+    display: flex;
+    justify-content: center;
+}
+.header > .contain{
+    background-color: #8b9ef591;
+    height: 30px;
+    position: fixed;
+}
+.gotop{
+    width: 40px;
+    height: 40px;
+    background-color: rgba(248, 65, 4, 0.493);
+    position: fixed;
+    bottom: 20px;
+    right:20px;
+    border-radius: 50%;
+    transition: all 2s ease;
+}
+.gotop:hover{
+    transform: scale(1.25);
+    background-color: rgba(0, 0, 255, 0.196);
+}
+.main{
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+.main > .fx{
+    display: flex;
+    gap:10px;
+    flex-direction: column;
+}
+.main > .fy{
+    display: flex;
+    gap:10px;
+}
+.main >.fx > .fxx{
+    display: flex;
+    gap:10px;
+}       
+.fxx{
+    background-color:rgba(227, 230, 239, 0.425);
+    height: auto;
+    flex:auto;
+}
+.fx{
+    background-color:#f20e0e98;
+    height: 200px;
+    flex:auto;
+}
+.fy{
+    background-color:#f20e0e98;;
+    height: 200px;
+    flex:auto;
+}
+.fyy{
+    background-color:rgba(244, 243, 239, 0.381);
+    height:auto;
+    flex:auto;
+}
+.main >.fy > .fyy{
+    display: flex;
+    gap:10px;
+
+}
+@media (max-width: 960px) {
+    .main {
+        flex-direction: column;   
+        align-items: stretch;     
+    }
+    .main > * {
+        width: 100%;
+    }
+}
