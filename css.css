@@ -92,22 +92,22 @@ h3{
     gap:10px;
 }       
 .fxx{
-    background-color:rgba(227, 230, 239, 0.425);
+    background-color:rgba(245, 63, 63, 0.425);
     height: auto;
     flex:auto;
 }
 .fx{
-    background-color:#f20e0e98;
+    background-color:#ef333340;
     height: 200px;
     flex:auto;
 }
 .fy{
-    background-color:#f20e0e98;;
+    background-color:#f964646f;;
     height: 200px;
     flex:auto;
 }
 .fyy{
-    background-color:rgba(244, 243, 239, 0.381);
+    background-color:rgba(222, 74, 74, 0.493);
     height:auto;
     flex:auto;
 }
