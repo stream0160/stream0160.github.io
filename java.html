@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>基础语法练习题</title>
+</head>
+<body>
+<script>
+    // ========== 1. 菱形图案（* 号） ==========
+    document.write("<h3>1. 菱形图案</h3><pre>");
+    var n = 7;      // 总行数（奇数）
+    var mid = Math.floor(n / 2); // 中间行索引（从0开始）
+    for (var i = 0; i < n; i++) {
+        // 计算空格数
+        var spaceCount = Math.abs(mid - i);
+        // 计算星号数
+        var starCount = 2 * (mid - spaceCount) + 1;
+        // 输出空格
+        for (var s = 0; s < spaceCount; s++) {
+            document.write(" ");
+        }
+        // 输出星号
+        for (var t = 0; t < starCount; t++) {
+            document.write("*");
+        }
+        document.write("<br>");
+    }
+    document.write("</pre>");
+
+    // ========== 2. 九九乘法表 ==========
+    document.write("<h3>2. 九九乘法表</h3><pre>");
+    for (var i = 1; i <= 9; i++) {
+        for (var j = 1; j <= i; j++) {
+            document.write(j + " * " + i + " = " + (i * j));
+            if (j != i) {
+                document.write("  "); // 两个空格分隔
+            }
+        }
+        document.write("<br>");
+    }
+    document.write("</pre>");
+
+    // ========== 3. 统计单词个数 ==========
+    var str = "Rome was not built in a day";
+    // 基础方法：遍历统计空格数，单词数 = 空格数 + 1
+    var spaceCount = 0;
+    for (var i = 0; i < str.length; i++) {
+        if (str[i] == " ") {
+            spaceCount++;
+        }
+    }
+    var wordCount = spaceCount + 1;
+    document.write("<h3>3. 统计单词个数</h3>");
+    document.write("字符串: " + str + "<br>");
+    document.write("单词个数: " + wordCount + "<br>");
+
+    // ========== 4. 删除字符串 "Hello Lvye" 中的所有 'e'，并加感叹号 ==========
+    var original = "Hello Lvye";
+    var newStr = "";
+    for (var i = 0; i < original.length; i++) {
+        if (original[i] != 'e') {
+            newStr = newStr + original[i];
+        }
+    }
+    newStr = newStr + "!";   // 最终得到 "Hllo Lvy!"
+    document.write("<h3>4. 删除所有 'e' 并加感叹号</h3>");
+    document.write("原始: " + original + "<br>");
+    document.write("结果: " + newStr + "<br>");
+
+    // ========== 5. 字符串反转 ==========
+    var example = "abcde";
+    var reversed = "";
+    for (var i = example.length - 1; i >= 0; i--) {
+        reversed = reversed + example[i];
+    }
+    document.write("<h3>5. 字符串反转</h3>");
+    document.write("原始: " + example + "<br>");
+    document.write("反转: " + reversed + "<br>");
+</script>
+</body>
+</html>
