@@ -54,15 +54,10 @@ h3{
     display: flex;
     justify-content: center;
 }
-.header > .contain{
-    background-color: #8b9ef591;
-    height: 30px;
-    position: fixed;
-}
 .gotop{
     width: 40px;
     height: 40px;
-    background-color: rgba(248, 65, 4, 0.493);
+    background-color: rgba(30, 21, 19, 0.493);
     position: fixed;
     bottom: 20px;
     right:20px;
@@ -96,20 +91,24 @@ h3{
     height: auto;
     flex:auto;
 }
-.fx{
-    background-color:#ef333340;
-    height: 200px;
-    flex:auto;
+.fx, .fy {
+    background-color:#3388ef40;
+    min-height: 400px;        
+    flex: 1 1 auto;           
 }
-.fy{
-    background-color:#f964646f;;
-    height: 200px;
-    flex:auto;
+.fy {
+    background-color:#f964646f;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-.fyy{
+.fyy {
     background-color:rgba(222, 74, 74, 0.493);
-    height:auto;
-    flex:auto;
+    flex: 1;                  
+    min-height: 0;           
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .main >.fy > .fyy{
     display: flex;
@@ -123,5 +122,148 @@ h3{
     }
     .main > * {
         width: 100%;
+    }
+}
+.header .contain {
+    background-color: #8b9ef589;
+    height: 30px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+
+    line-height: 30px;
+    text-align: center;
+    font-size: 14px;
+    color: #fff;
+    font-weight: normal;
+}
+body {
+    padding-top: 30px;
+}
+
+.editor-area,
+.preview-area {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-area textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    background-color: #fafafc;
+    color: #050500;
+    box-sizing: border-box;
+}
+
+.preview-area iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: white;
+}
+@media (max-width: 960px) {
+    .fx {
+        height: auto;
+        min-height: 400px;
+    }
+    .editor-area textarea {
+        min-height: 250px;
+    }
+    .preview-area iframe {
+        min-height: 250px;
+    }
+}
+.editor-area textarea {
+    white-space: pre-line;   
+}
+#carouselSection {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #a9c1f42e;
+    min-height: 400px;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.carousel-box {
+    width: 100%;
+    max-width: 300px;       
+    margin: 0 auto;
+    text-align: center;
+}
+
+
+.carousel-img-wrapper {
+    width: 100%;
+    background-color: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#carouselImg {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 3 / 5;      
+    object-fit: cover;         
+    object-position: center;   
+}
+
+
+.carousel-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;        
+}
+
+
+.carousel-buttons span {
+    display: block;
+    width: 12px;
+    height: 12px;
+    min-width: 12px;          
+    min-height: 12px;
+    background-color: #f4f2f2;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;           
+}
+
+.carousel-buttons span.active {
+    background-color: #2952d785;
+    transform: scale(1.2);
+}
+
+@media (max-width: 600px) {
+    .carousel-buttons span {
+        width: 10px;
+        height: 10px;
+        min-width: 10px;
+        min-height: 10px;
+    }
+    .carousel-buttons {
+        gap: 10px;
+    }
+    .carousel-box {
+        max-width: 240px;
     }
 }

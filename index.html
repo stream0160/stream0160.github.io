@@ -16,7 +16,7 @@
         <div class="contain"></div>
     </div>
   <div class="container">
-    <h1>绫波丽</h1>
+    <h1>王尊浩</h1>
     <div class="dt">
       <img src="rei.gif" width="200px">
       <h4>
@@ -27,17 +27,17 @@
     </div>
     <hr>
     <ul>
-      <li><b>性别：</b>女</li>
-      <li><b>电话：</b><a href="https://lab.magiconch.com/sakana/" target="_blank">……</a></li>
-      <li><b>邮箱：</b>……</li>
-      <li><b>生日：</b>2001.03.30</li>
+      <li><b>性别：</b>男</li>
+      <li><b>电话：</b><a href="https://lab.magiconch.com/sakana/" target="_blank">1145141919810</a></li>
+      <li><b>邮箱：</b>3523864133@qq.com</li>
+      <li><b>生日：</b>2006.01.16</li>
       <li><b>兴趣：</b>...</li>
     </ul>
     <hr>
     <h3>教育背景Education</h3>
     <table style="width:100%">
       <tr><td>时间</td><td>学校</td><td>职务</td></tr>
-      <tr><td>……</td><td>……</td><td>……</td></tr>
+      <tr><td>2024年9月-至今</td><td>上海对外经贸大学</td><td>学生</td></tr>
       <tr><td>……</td><td>……</td><td>……</td></tr>
     </table>
     <h3>工作经验...</h3>
@@ -51,16 +51,189 @@
     <p>……<br>再见</p>
   </div>
   <div class="main">
-      <div class="fx">
-          <div class="fxx"></div>
-          <div class="fxx"></div>
+    <div class="fx">
+      <div class="fxx editor-area">
+        <textarea id="htmlEditor" placeholder="在这里编写 HTML 代码...&#10;功能说明：鼠标移入高亮边框 | 右键编辑区清空当前代码 | Tab缩进 | 实时预览"></textarea>
       </div>
-      <div class="fx"></div>
+      <div class="fxx preview-area">
+        <iframe id="previewFrame" title="实时预览" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+    </div>
+    </div>
+      <div class="fx">
+        <div class="fx" id="carouselSection">
+    <div class="carousel-box">
+        <div class="carousel-img-wrapper">
+            <img id="carouselImg" src="https://picsum.photos/300/500?random=1" alt="轮播图片">
+        </div>
+        <div class="carousel-buttons" id="carouselButtons">
+            <span data-index="0" class="active"></span>
+            <span data-index="1"></span>
+            <span data-index="2"></span>
+            <span data-index="3"></span>
+        </div>
+    </div>
+</div>
+      </div>
       <div class="fy">
           <div class="fyy"></div>
           <div class="fyy"></div>
       </div>
   </div>
   <div class="gotop"></div>
+<script>
+    const containDiv = document.querySelector('.header .contain');
+    
+    function formatNumber(n) {
+        return n < 10 ? '0' + n : n;
+    }
+
+    function getWeekDay(dayNum) {
+        const weeks = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        return weeks[dayNum];
+    }
+    
+    function updateDateTime() {
+        const now = new Date();
+        
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;    
+        const date = now.getDate();
+        const week = getWeekDay(now.getDay());
+        const hours = formatNumber(now.getHours());
+        const minutes = formatNumber(now.getMinutes());
+        const seconds = formatNumber(now.getSeconds());
+
+        const dateTimeStr = `你好，现在是${year}年${month}月${date}日 ${week} ${hours}:${minutes}:${seconds}`;
+
+        containDiv.textContent = dateTimeStr;
+    }
+    
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+</script>
+
+<script>
+  const carouselImg = document.getElementById('carouselImg');
+  const btns = document.querySelectorAll('#carouselButtons span');
+  let currentIndex = 0;
+  let autoInterval = null;
+
+  const imgList = [
+      'https://picsum.photos/300/500?random=1',
+      'https://picsum.photos/300/500?random=2',
+      'https://picsum.photos/300/500?random=3',
+      'https://picsum.photos/300/500?random=4'
+  ];
+
+  function switchToImage(index) {
+      if (index < 0) index = 0;
+      if (index >= imgList.length) index = 0;
+      currentIndex = index;
+      carouselImg.src = imgList[currentIndex];
+      btns.forEach((btn, i) => {
+          if (i === currentIndex) btn.classList.add('active');
+          else btn.classList.remove('active');
+      });
+}
+
+  function nextImage() {
+      let next = currentIndex + 1;
+      if (next >= imgList.length) next = 0;
+      switchToImage(next);
+  }
+
+  function startAutoPlay() {
+      if (autoInterval) clearInterval(autoInterval);
+      autoInterval = setInterval(nextImage, 3000);
+  }
+
+  function stopAutoPlay() {
+      if (autoInterval) {
+          clearInterval(autoInterval);
+          autoInterval = null;
+      }
+  }
+
+  btns.forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+          stopAutoPlay();
+          switchToImage(idx);
+          startAutoPlay();
+      });
+  });
+    window.onload = function() {
+        const editor = document.getElementById('htmlEditor');
+        const iframe = document.getElementById('previewFrame');
+        
+const defaultHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello World</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+</body>
+</html>`;
+        
+        function updatePreview() {
+            const code = editor.value;
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(code);
+            iframeDoc.close();
+        }
+        
+        editor.value = defaultHtml;
+        updatePreview();
+        
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault(); 
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                const spaces = '  ';
+                this.value = this.value.substring(0, start) + spaces + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + spaces.length;
+                this.dispatchEvent(new Event('input'));
+            }
+        });
+        
+        editor.addEventListener('input', updatePreview);
+        
+        const editorDiv = document.querySelector('.editor-area');
+        const previewDiv = document.querySelector('.preview-area');
+        
+        editorDiv.addEventListener('mouseover', function() {
+            this.style.boxShadow = '0 0 0 2px #ff6600';
+            this.style.transition = '0.2s';
+        });
+        editorDiv.addEventListener('mouseout', function() {
+            this.style.boxShadow = 'none';
+        });
+        
+        previewDiv.addEventListener('mouseover', function() {
+            this.style.boxShadow = '0 0 0 2px #3399ff';
+        });
+        previewDiv.addEventListener('mouseout', function() {
+            this.style.boxShadow = 'none';
+        });
+        
+        editorDiv.addEventListener('click', function() {
+            editor.focus();
+            console.log('编辑器获得焦点');
+        });
+        
+        editorDiv.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          const userConfirmed = confirm('是否清空编辑器中的所有代码？');
+          if (userConfirmed) {
+            editor.value = '';
+            updatePreview();
+            editor.focus();
+          }
+        });
+    };
+</script>
 </body>
 </html>
