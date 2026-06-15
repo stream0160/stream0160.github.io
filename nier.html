@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The [E]nd of YoRHa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Fira Code', monospace;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 0 1px #222, 0 0 0 3px #000000;
+            border-radius: 12px;
+            cursor: none;
+            background-color: #000000;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="1000" height="700"></canvas>
+    </div>
+</div>
+<audio id="bgmAudio" src="nier.mp4" loop preload="auto" style="display:none;"></audio>
+
+<script>
+    (function(){
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const bgm = document.getElementById('bgmAudio');
+        let musicStarted = false;
+        
+        let gameActive = true;
+        let gameWin = false;
+        let gameLose = false;
+        let animationId = null;
+        
+        let gameTimeSeconds = 0;
+        let lastFrameTime = 0;
+        
+        let godMode = false;
+        
+        let player = {
+            x: canvas.width/2,
+            y: canvas.height - 80,
+            radius: 14,
+            hp: 10,
+            maxHp: 10,
+            invincibleTimer: 0,
+            invincibleFlash: 0
+        };
+        
+        let wingmen = [];
+        let nextWingmanId = 1;
+        const MAX_WINGMEN = 6;
+        const ORBIT_RADIUS = 58;
+        let hasReceivedFullSquad = false;
+        
+        let wingmanRespawnCooldown = 0;
+        const WINGMAN_RESPAWN_DELAY = 3.0;
+        
+        let enemies = [];
+        let playerBullets = [];
+        let enemyBullets = [];
+        
+        let particles = [];
+        let popupMessages = [];
+        
+        let shootCooldown = 0;
+        const SHOOT_DELAY_FRAMES = 11;
+        
+        let currentMaxEnemies = 6;
+        const MAX_ENEMIES_LIMIT = 24;
+        let enemySpawnTimer = 0;
+        const ENEMY_SPAWN_BASE = 58;
+        
+        let mouseX = canvas.width/2;
+        let mouseY = canvas.height - 80;
+        
+        const enemyTexts = ["YoRHa", "N2", "Pod", "Logic", "VIRUS", "ERROR", "FALSE", "END", "BLACK", "WHITE", "ARK", "HACK"];
+        
+        function addPopupMessage(msg) {
+            popupMessages.push({ text: msg, life: 100 });
+        }
+        
+        function addRedSquareParticles(x, y, count = 10) {
+            for(let i=0; i<count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.8 + Math.random() * 2.5;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                particles.push({
+                    x: x, y: y, vx: vx, vy: vy,
+                    life: 18 + Math.random() * 14,
+                    size: 3 + Math.random() * 5,
+                    color: "#ff7744"
+                });
+            }
+        }
+        
+        function addHitParticles(x, y, count = 12, color = "#ff4444") {
+            for(let i=0; i<count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.8 + Math.random() * 2.5;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                particles.push({
+                    x: x, y: y, vx: vx, vy: vy,
+                    life: 18 + Math.random() * 14,
+                    size: 2 + Math.random() * 4,
+                    color: color
+                });
+            }
+        }
+        
+        function randomWingmanName() {
+            const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const letter = letters[Math.floor(Math.random() * letters.length)];
+            const digit = Math.floor(Math.random() * 10);
+            return `${letter}${digit}`;
+        }
+        
+        class WingmanFlyIn {
+            constructor(wingmanData, targetX, targetY, targetAngle) {
+                this.wingman = wingmanData;
+                this.startX = canvas.width + 50;
+                this.startY = canvas.height + 50;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.targetAngle = targetAngle;
+                this.progress = 0;
+                this.duration = 30;
+                this.frame = 0;
+                this.active = true;
+            }
+            update() {
+                if (!this.active) return true;
+                this.frame++;
+                this.progress = Math.min(1, this.frame / this.duration);
+                const ease = 1 - Math.pow(1 - this.progress, 3);
+                this.wingman.x = this.startX + (this.targetX - this.startX) * ease;
+                this.wingman.y = this.startY + (this.targetY - this.startY) * ease;
+                if (this.progress >= 1) {
+                    this.wingman.x = this.targetX;
+                    this.wingman.y = this.targetY;
+                    return true;
+                }
+                return false;
+            }
+        }
+        
+        let flyingWingmen = [];
+        
+        function addWingmanWithFlyIn() {
+            if(wingmen.length + flyingWingmen.length >= MAX_WINGMEN) return false;
+            const name = randomWingmanName();
+            const totalCount = wingmen.length + flyingWingmen.length;
+            const angle = (totalCount / MAX_WINGMEN) * Math.PI * 2;
+            const targetX = player.x + Math.cos(angle) * ORBIT_RADIUS;
+            const targetY = player.y + Math.sin(angle) * ORBIT_RADIUS;
+            
+            const newWingman = {
+                id: nextWingmanId++,
+                angle: angle,
+                radius: 12,
+                name: name,
+                orbitDist: ORBIT_RADIUS,
+                x: targetX,
+                y: targetY,
+                shootCd: 0,
+                invincibleTimer: 0,
+                isFlying: true
+            };
+            const flyIn = new WingmanFlyIn(newWingman, targetX, targetY, angle);
+            flyingWingmen.push({ wingman: newWingman, anim: flyIn });
+            return true;
+        }
+        
+        function finalizeWingman(wingmanObj) {
+            wingmen.push(wingmanObj);
+            rebalanceWingmanAngles();
+            addPopupMessage(`收到${wingmanObj.name} 的帮助`);
+        }
+        
+        function killWingman(wingmanObj, index) {
+            if(index === undefined) {
+                index = wingmen.findIndex(w => w.id === wingmanObj.id);
+            }
+            if(index === -1) return;
+            const deadName = wingmen[index].name;
+            addPopupMessage(`${deadName} 的存档丢失`);
+            addHitParticles(wingmen[index].x, wingmen[index].y, 16, "#ff6666");
+            wingmen.splice(index,1);
+            rebalanceWingmanAngles();
+            if(player.invincibleTimer < 120) player.invincibleTimer = 120;
+            for(let w of wingmen) {
+                if(w.invincibleTimer < 120) w.invincibleTimer = 120;
+            }
+            for(let item of flyingWingmen) {
+                if(item.wingman.invincibleTimer < 120) item.wingman.invincibleTimer = 120;
+            };
+        }
+        
+        function rebalanceWingmanAngles() {
+            const count = wingmen.length;
+            for(let i=0; i<count; i++) {
+                wingmen[i].angle = (i / count) * Math.PI * 2;
+            }
+        }
+        
+        function onPlayerHit() {
+            if(!gameActive) return;
+            if(godMode) return;
+            if(player.invincibleTimer <= 0) {
+                player.hp = Math.max(0, player.hp - 1);
+                player.invincibleTimer = 180;
+                player.invincibleFlash = 0;
+                addHitParticles(player.x, player.y, 14, "#ff6666");
+                if(player.hp <= 0) {
+                    gameActive = false;
+                    gameLose = true;
+                    addPopupMessage("Give up？");
+                }
+            }
+        }
+        
+        function checkVictory() {
+            if(!gameActive) return;
+            if(gameTimeSeconds >= 300) {
+                gameActive = false;
+                gameWin = true;
+                addPopupMessage("The [end] of YoRha");
+            }
+        }
+        
+        function updateWingmanFullSquad() {
+            if(!gameActive) return;
+            if(!hasReceivedFullSquad && gameTimeSeconds >= 180) {
+                hasReceivedFullSquad = true;
+                addPopupMessage("arrive");
+                for(let i=0; i<MAX_WINGMEN; i++) {
+                    addWingmanWithFlyIn();
+                }
+            }
+        }
+        
+        function updateWingmanRespawn() {
+            if(!gameActive) return;
+            if(!hasReceivedFullSquad) return;
+            if(wingmanRespawnCooldown > 0) {
+                wingmanRespawnCooldown -= 1/60;
+                if(wingmanRespawnCooldown < 0) wingmanRespawnCooldown = 0;
+            }
+            if(wingmanRespawnCooldown <= 0 && (wingmen.length + flyingWingmen.length) < MAX_WINGMEN) {
+                addWingmanWithFlyIn();
+                wingmanRespawnCooldown = WINGMAN_RESPAWN_DELAY;
+            }
+        }
+        
+        function updateMaxEnemiesByTime() {
+            let addCount = Math.floor(gameTimeSeconds / 30);
+            let newMax = 6 + addCount;
+            if(newMax > MAX_ENEMIES_LIMIT) newMax = MAX_ENEMIES_LIMIT;
+            currentMaxEnemies = newMax;
+        }
+        
+        function fullReset() {
+            gameActive = true;
+            gameWin = false;
+            gameLose = false;
+            gameTimeSeconds = 0;
+            lastFrameTime = 0;
+            wingmen = [];
+            flyingWingmen = [];
+            enemies = [];
+            playerBullets = [];
+            enemyBullets = [];
+            particles = [];
+            popupMessages = [];
+            shootCooldown = 0;
+            enemySpawnTimer = 10;
+            nextWingmanId = 1;
+            hasReceivedFullSquad = false;
+            wingmanRespawnCooldown = 0;
+            godMode = false;
+            currentMaxEnemies = 6;
+            
+            player = {
+                x: canvas.width/2,
+                y: canvas.height - 80,
+                radius: 14,
+                hp: 10,
+                maxHp: 10,
+                invincibleTimer: 0,
+                invincibleFlash: 0
+            };
+            mouseX = player.x;
+            mouseY = player.y;
+            addPopupMessage("restart");
+        }
+        
+        function spawnEnemyBullet(e) {
+            const bulletCount = 2 + Math.floor(Math.random() * 2);
+            for (let shot = 0; shot < bulletCount; shot++) {
+                const randomAngle = Math.random() * Math.PI * 2;
+                const speedBase = 0.9 + Math.random() * 0.8;
+                let vx = Math.cos(randomAngle) * speedBase;
+                let vy = Math.sin(randomAngle) * speedBase;
+                const type = Math.floor(Math.random() * 4);
+                let phase = 0, sinAmp = 0, arcCurve = 0;
+                if(type === 2) {
+                    phase = Math.random() * Math.PI * 2;
+                    sinAmp = 0.4 + Math.random() * 0.7;
+                } else if(type === 3) {
+                    phase = Math.random() * Math.PI * 2;
+                    arcCurve = (Math.random() - 0.5) * 0.1;
+                }
+                enemyBullets.push({
+                    x: e.x, y: e.y,
+                    radius: 16,
+                    vx: vx, vy: vy,
+                    type: type,
+                    phase: phase,
+                    sinAmp: sinAmp,
+                    arcCurve: arcCurve,
+                    cancelable: Math.random() < 0.7
+                });
+            }
+        }
+        
+        function updateGame() {
+            if(!gameActive) return;
+            
+            let now = Date.now();
+            if(lastFrameTime === 0) lastFrameTime = now;
+            let delta = Math.min(0.033, (now - lastFrameTime) / 1000);
+            if(delta > 0 && delta < 0.1) {
+                gameTimeSeconds += delta;
+                updateMaxEnemiesByTime();
+                if(Math.floor(gameTimeSeconds) !== Math.floor(gameTimeSeconds - delta)) {
+                    checkVictory();
+                    updateWingmanFullSquad();
+                }
+            }
+            lastFrameTime = now;
+            if(gameTimeSeconds >= 300) return;
+            
+            if(player.invincibleTimer > 0) player.invincibleTimer--;
+            if(player.invincibleFlash > 0) player.invincibleFlash--;
+            updateWingmanRespawn();
+            
+            let newX = mouseX;
+            let newY = mouseY;
+            newX = Math.min(Math.max(newX, 28), canvas.width-28);
+            newY = Math.min(Math.max(newY, 45), canvas.height-45);
+            player.x = newX;
+            player.y = newY;
+            
+            if(shootCooldown <= 0) {
+                playerBullets.push({
+                    x: player.x - 6,
+                    y: player.y - 30,
+                    w: 12,
+                    h: 36,
+                    speedY: -5.2
+                });
+                shootCooldown = SHOOT_DELAY_FRAMES;
+            } else {
+                shootCooldown--;
+            }
+            
+            for(let i=0; i<playerBullets.length; i++) {
+                playerBullets[i].y += playerBullets[i].speedY;
+                if(playerBullets[i].y + playerBullets[i].h < 0 || playerBullets[i].y > canvas.height) {
+                    playerBullets.splice(i,1);
+                    i--;
+                }
+            }
+            
+            for(let i=0; i<enemies.length; i++) {
+                const e = enemies[i];
+                e.y += e.speedY;
+                e.x += e.speedX;
+                if(e.y + e.radius > canvas.height + 100 || e.y + e.radius < -100 || e.x + e.radius < -130 || e.x - e.radius > canvas.width+130) {
+                    enemies.splice(i,1);
+                    i--;
+                }
+            }
+            
+            for(let e of enemies) {
+                if(Math.random() < 0.008) {
+                    spawnEnemyBullet(e);
+                }
+            }
+            
+            for(let i=0; i<enemyBullets.length; i++) {
+                const eb = enemyBullets[i];
+                if(eb.type === 2) {
+                    eb.phase += 0.08;
+                    const offsetX = Math.sin(eb.phase) * eb.sinAmp;
+                    const offsetY = Math.cos(eb.phase) * eb.sinAmp;
+                    eb.x += eb.vx + offsetX * 0.15;
+                    eb.y += eb.vy + offsetY * 0.15;
+                } else if(eb.type === 3) {
+                    eb.phase += 0.06;
+                    const curveX = Math.sin(eb.phase) * eb.arcCurve * 1.2;
+                    const curveY = Math.cos(eb.phase*0.7) * eb.arcCurve * 1.0;
+                    eb.x += eb.vx + curveX;
+                    eb.y += eb.vy + curveY;
+                } else {
+                    eb.x += eb.vx;
+                    eb.y += eb.vy;
+                }
+                if(eb.x + 25 < -100 || eb.x - 25 > canvas.width+100 || eb.y + 25 < -120 || eb.y - 25 > canvas.height+160) {
+                    enemyBullets.splice(i,1);
+                    i--;
+                }
+            }
+            
+            if(enemySpawnTimer <= 0 && enemies.length < currentMaxEnemies) {
+                let radius = 16 + Math.random() * 7;
+                let speedY = 0.9 + Math.random() * 1.0;
+                let speedX = (Math.random() - 0.5) * 0.4;
+                const randText = enemyTexts[Math.floor(Math.random() * enemyTexts.length)];
+                enemies.push({
+                    x: 40 + Math.random() * (canvas.width - 80),
+                    y: -radius,
+                    radius: radius,
+                    speedY: Math.min(speedY, 2.2),
+                    speedX: speedX,
+                    text: randText,
+                    hp: 3
+                });
+                enemySpawnTimer = ENEMY_SPAWN_BASE;
+            } else {
+                if(enemySpawnTimer > 0) enemySpawnTimer--;
+            }
+            
+            for(let i=0; i<playerBullets.length; i++) {
+                const bullet = playerBullets[i];
+                const centerX = bullet.x + bullet.w/2;
+                const centerY = bullet.y + bullet.h/2;
+                let hitIdx = -1;
+                for(let j=0; j<enemies.length; j++) {
+                    const e = enemies[j];
+                    const dx = centerX - e.x;
+                    const dy = centerY - e.y;
+                    const dist = Math.hypot(dx, dy);
+                    if(dist < e.radius + Math.max(bullet.w, bullet.h)/2.2) {
+                        hitIdx = j;
+                        break;
+                    }
+                }
+                if(hitIdx !== -1) {
+                    const targetEnemy = enemies[hitIdx];
+                    addRedSquareParticles(targetEnemy.x, targetEnemy.y, 8);
+                    targetEnemy.hp -= 1;
+                    playerBullets.splice(i,1);
+                    if(targetEnemy.hp <= 0) {
+                        addRedSquareParticles(targetEnemy.x, targetEnemy.y, 16);
+                        enemies.splice(hitIdx,1);
+                    }
+                    i--;
+                }
+            }
+            
+            for(let i=0; i<playerBullets.length; i++) {
+                const bullet = playerBullets[i];
+                const centerX = bullet.x + bullet.w/2;
+                const centerY = bullet.y + bullet.h/2;
+                let hitBullet = -1;
+                for(let j=0; j<enemyBullets.length; j++) {
+                    const eb = enemyBullets[j];
+                    if(!eb.cancelable) continue;
+                    const dx = centerX - eb.x;
+                    const dy = centerY - eb.y;
+                    const dist = Math.hypot(dx, dy);
+                    if(dist < eb.radius + Math.max(bullet.w, bullet.h)/2.2) {
+                        hitBullet = j;
+                        break;
+                    }
+                }
+                if(hitBullet !== -1) {
+                    addHitParticles(enemyBullets[hitBullet].x, enemyBullets[hitBullet].y, 6, "#ffaa88");
+                    enemyBullets.splice(hitBullet,1);
+                    playerBullets.splice(i,1);
+                    i--;
+                }
+            }
+            
+            for(let i=0; i<flyingWingmen.length; i++) {
+                const item = flyingWingmen[i];
+                const completed = item.anim.update();
+                if(completed) {
+                    finalizeWingman(item.wingman);
+                    flyingWingmen.splice(i,1);
+                    i--;
+                }
+            }
+            
+            for(let w of wingmen) {
+                if(w.invincibleTimer > 0) w.invincibleTimer--;
+                w.angle += 0.024;
+                w.x = player.x + Math.cos(w.angle) * w.orbitDist;
+                w.y = player.y + Math.sin(w.angle) * w.orbitDist;
+                if(w.shootCd === undefined) w.shootCd = 0;
+                if(w.shootCd <= 0) {
+                    playerBullets.push({
+                        x: w.x - 5,
+                        y: w.y - 16,
+                        w: 10,
+                        h: 30,
+                        speedY: -5.2,
+                        speedX: 0,
+                        fromWingman: true
+                    });
+                    w.shootCd = 30;
+                } else {
+                    w.shootCd--;
+                }
+            }
+            
+            for(let i=0; i<wingmen.length; i++) {
+                const w = wingmen[i];
+                for(let j=0; j<enemyBullets.length; j++) {
+                    const eb = enemyBullets[j];
+                    const dx = w.x - eb.x;
+                    const dy = w.y - eb.y;
+                    if(Math.hypot(dx, dy) < w.radius + eb.radius) {
+                        enemyBullets.splice(j,1);
+                        j--;
+                        if(w.invincibleTimer > 0) {
+                            addHitParticles(w.x, w.y, 8, "#8888ff");
+                            continue;
+                        }
+                        killWingman(w, i);
+                        break;
+                    }
+                }
+            }
+            
+            for(let i=0; i<enemyBullets.length; i++) {
+                const eb = enemyBullets[i];
+                const dx = player.x - eb.x;
+                const dy = player.y - eb.y;
+                if(Math.hypot(dx, dy) < player.radius + eb.radius) {
+                    onPlayerHit();
+                    enemyBullets.splice(i,1);
+                    i--;
+                    if(!gameActive) break;
+                }
+            }
+            
+            if(Math.random() < 0.14) {
+                particles.push({
+                    x: player.x + (Math.random() - 0.5) * 14,
+                    y: player.y + 12 + Math.random() * 28,
+                    vx: (Math.random() - 0.5) * 0.32,
+                    vy: Math.random() * 0.65 + 0.2,
+                    life: 68 + Math.random() * 48,
+                    size: 3.5 + Math.random() * 7.0,
+                    color: "#ffffff"
+                });
+            }
+            
+            for(let i=0; i<particles.length; i++) {
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+                particles[i].life--;
+                if(particles[i].life <= 0) {
+                    particles.splice(i,1);
+                    i--;
+                }
+            }
+            
+            for(let i=0; i<popupMessages.length; i++) {
+                popupMessages[i].life--;
+                if(popupMessages[i].life <= 0) {
+                    popupMessages.splice(i,1);
+                    i--;
+                }
+            }
+        }
+        
+        function drawBackground() {
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "rgba(80, 80, 80, 0.2)";
+            ctx.lineWidth = 0.5;
+            for(let i = 0; i < canvas.width; i += 60) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+        }
+        
+        function drawShip(x, y, isPlayer = true, colorTint = "#f0f0f8") {
+            ctx.save();
+            if(isPlayer && player.invincibleTimer > 0 && !godMode) {
+                ctx.globalAlpha = 0.5;
+            } else if(godMode && isPlayer) {
+                ctx.shadowBlur = 16;
+                ctx.shadowColor = "#ffaa44";
+            }
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "#ffffff";
+            
+            const topX = x;
+            const topY = y - 34;
+            const rightMidX = x + 13;
+            const rightMidY = y - 8;
+            const bottomX = x;
+            const bottomY = y + 10;
+            const leftMidX = x - 13;
+            const leftMidY = y - 8;
+            
+            ctx.beginPath();
+            ctx.moveTo(topX, topY);
+            ctx.lineTo(rightMidX, rightMidY);
+            ctx.lineTo(bottomX, bottomY);
+            ctx.lineTo(leftMidX, leftMidY);
+            ctx.closePath();
+            ctx.fillStyle = colorTint;
+            ctx.fill();
+            ctx.strokeStyle = godMode && isPlayer ? "#ffcc66" : "#ffffff";
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y - 2);
+            ctx.lineTo(x - 12, y - 12);
+            ctx.moveTo(x, y - 2);
+            ctx.lineTo(x + 12, y - 12);
+            ctx.moveTo(x, y - 2);
+            ctx.lineTo(bottomX, bottomY);
+            ctx.shadowBlur = 2.5;
+            ctx.shadowColor = "rgba(100, 100, 130, 0.3)";
+            ctx.strokeStyle = "#787878";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.fillStyle = "#000000";
+            ctx.beginPath();
+            ctx.arc(x, y - 2, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#282828";
+            ctx.beginPath();
+            ctx.arc(x, y - 2, 3.2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(x - 11, y + 3, 4, 4);
+            ctx.fillRect(x + 7, y + 3, 4, 4);
+            ctx.save();
+            ctx.translate(x, y + 14);
+            ctx.rotate(Math.PI / 4);
+            ctx.fillStyle = godMode && isPlayer ? "#ffaa55" : "#ffffff";
+            ctx.fillRect(-3, -3, 5, 5);
+            ctx.restore();
+            ctx.restore();
+        }
+        
+        function drawPlayer() { drawShip(player.x, player.y, true, "#f0f0f8"); }
+        
+        function drawWingmen() {
+            for(let w of wingmen) {
+                drawShip(w.x, w.y, false, "#d0d0e0");
+            }
+            for(let item of flyingWingmen) {
+                const w = item.wingman;
+                ctx.save();
+                ctx.globalAlpha = 0.7;
+                drawShip(w.x, w.y, false, "#c0c0d0");
+                ctx.restore();
+            }
+        }
+        
+        function drawEnemies() {
+            for(let e of enemies) {
+                ctx.save();
+                ctx.shadowColor = "rgba(255, 0, 0, 0.9)";
+                ctx.shadowBlur = 12;
+                ctx.font = `bold ${Math.floor(e.radius + 5)}px "Courier New", monospace`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(e.text, e.x, e.y);
+                ctx.restore();
+            }
+        }
+        
+        function drawPlayerBullets() {
+            for(let b of playerBullets) {
+                ctx.fillStyle = "#ffffff";
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+                ctx.fill();
+            }
+        }
+        
+        function drawEnemyBullets() {
+            for(let eb of enemyBullets) {
+                const mainColor = eb.cancelable ? "#ff3333" : "#cc44ff";
+                const lightColor = eb.cancelable ? "#ff8888" : "#ee88ff";
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, eb.radius-4, 0, Math.PI*2);
+                ctx.fillStyle = mainColor;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, eb.radius-8, 0, Math.PI*2);
+                ctx.fillStyle = lightColor;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, 3.5, 0, Math.PI*2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+            }
+        }
+        
+        function drawParticles() {
+            for(let p of particles) {
+                ctx.globalAlpha = Math.min(1, p.life / 30);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+            }
+            ctx.globalAlpha = 1;
+        }
+        
+        function drawPopupMessages() {
+            let yOffset = canvas.height - 25;
+            for(let i=popupMessages.length-1; i>=0; i--) {
+                const msg = popupMessages[i];
+                let alpha = Math.min(1, msg.life / 40);
+                ctx.font = "12px monospace";
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.fillText(msg.text, canvas.width - 240, yOffset);
+                yOffset -= 18;
+            }
+        }
+        
+        function drawEndMessage() {
+            if(gameWin) {
+                ctx.fillStyle = "rgba(0,0,0,0.94)";
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.font = "bold 28px monospace";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText("The [E]nd of YoRHa", canvas.width/2-240, canvas.height/2-40);
+                ctx.font = "18px monospace";
+                ctx.fillStyle = "#cccccc";
+                ctx.fillText("「 E 」", canvas.width/2-190, canvas.height/2+30);
+                ctx.font = "14px monospace";
+                ctx.fillStyle = "#aaaaaa";
+                ctx.fillText("按 R 键 或 刷新页面 重试", canvas.width/2-150, canvas.height/2+100);
+            } else if(gameLose) {
+                ctx.fillStyle = "rgba(0,0,0,0.96)";
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.font = "bold 28px monospace";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText("◈  轮回  ◈", canvas.width/2-150, canvas.height/2-40);
+                ctx.font = "16px monospace";
+                ctx.fillStyle = "#dddddd";
+                ctx.fillText("「 E 」", canvas.width/2-160, canvas.height/2+40);
+                ctx.font = "12px monospace";
+                ctx.fillStyle = "#bbbbbb";
+                ctx.fillText("按 R 键 或 刷新页面 重试", canvas.width/2-135, canvas.height/2+100);
+            }
+        }
+        
+        function render() {
+            drawBackground();
+            drawEnemyBullets();
+            drawEnemies();
+            drawPlayerBullets();
+            drawWingmen();
+            drawPlayer();
+            drawParticles();
+            drawPopupMessages();
+            if(gameWin || gameLose) drawEndMessage();
+        }
+        
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.moveTo(x+r, y);
+                this.lineTo(x+w-r, y);
+                this.quadraticCurveTo(x+w, y, x+w, y+r);
+                this.lineTo(x+w, y+h-r);
+                this.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+                this.lineTo(x+r, y+h);
+                this.quadraticCurveTo(x, y+h, x, y+h-r);
+                this.lineTo(x, y+r);
+                this.quadraticCurveTo(x, y, x+r, y);
+                return this;
+            };
+        }
+        
+        function startMusicOnInteraction() {
+            if (musicStarted) return;
+            if (bgm) {
+                bgm.volume = 0.5;
+                bgm.play().then(() => { musicStarted = true; }).catch(() => {});
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (!musicStarted) startMusicOnInteraction();
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (e.clientX - rect.left) * scaleX;
+            let canvasY = (e.clientY - rect.top) * scaleY;
+            canvasX = Math.min(Math.max(canvasX, 28), canvas.width-28);
+            canvasY = Math.min(Math.max(canvasY, 45), canvas.height-45);
+            mouseX = canvasX;
+            mouseY = canvasY;
+            if(gameActive && !gameWin && !gameLose) {
+                player.x = mouseX;
+                player.y = mouseY;
+            }
+        }
+        
+        function handleKeyDown(e) {
+            if (!musicStarted) startMusicOnInteraction();
+            if(e.key === 'u' || e.key === 'U') {
+                e.preventDefault();
+                godMode = !godMode;
+                if(godMode) { addPopupMessage("无敌模式开启"); player.hp = player.maxHp; }
+                else addPopupMessage("无敌模式关闭");
+            }
+            if(e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                fullReset();
+                gameActive = true;
+                gameWin = false;
+                gameLose = false;
+                gameTimeSeconds = 0;
+                lastFrameTime = 0;
+            }
+        }
+        
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', () => { if (!musicStarted) startMusicOnInteraction(); });
+        window.addEventListener('keydown', handleKeyDown);
+        
+        fullReset();
+        function gameLoop() {
+            updateGame();
+            render();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+    })();
+</script>
+</body>
+</html>
